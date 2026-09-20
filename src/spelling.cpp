@@ -106,6 +106,64 @@ Tables build()
     t.add("dreamt", "dreamed", ToUs);
     t.add("got", "gotten", ToUk);        // "gotten" becomes "got" under Traditional
 
+    // British <-> American VOCABULARY: different words for the same thing,
+    // not spelling variants of one word. convert() only ever looks up ONE
+    // word at a time, so a source phrase of more than one word can never be
+    // matched -- a pair where only one side is a phrase still works in the
+    // direction where the single word is the thing being looked up, and is
+    // just quietly inert in the other direction. A pair where BOTH sides are
+    // phrases ("parking lot" / "car park", "driver's license" / "driving
+    // licence", and a dozen more like them) isn't in this table at all: it
+    // would never fire either way, so it would just be dead weight here.
+    t.add("flat", "apartment");
+    t.add("anaesthetist", "anesthesiologist");
+    t.add("starter", "appetizer");
+    t.add("barrister", "attorney");
+    t.add("toilet", "bathroom");
+    t.add("biscuit", "cookie");
+    t.add("grill", "broil");
+    t.add("grill", "broiler", ToUk);      // second American word for the same British "grill"; the British word always comes back as "broil"
+    t.add("sweets", "candy");
+    t.add("candyfloss", "cotton candy");  // one-directional: "cotton candy" is two words
+    t.add("wardrobe", "closet");
+    t.add("anticlockwise", "counterclockwise");
+    t.add("cot", "crib");
+    t.add("nappy", "diaper");
+    t.add("chemist", "pharmacy");
+    t.add("chemist", "drugstore", ToUk);  // second American word for the same British "chemist"; "chemist" itself always comes back as "pharmacy"
+    t.add("rubber", "eraser");
+    t.add("motorway", "expressway");
+    t.add("motorway", "interstate", ToUk); // second American word for the same British "motorway"
+    t.add("petrol", "gasoline");
+    t.add("bonnet", "hood");
+    t.add("chips", "French fries");
+    t.add("crisps", "chips");             // the OTHER "chips" -- American "chips" (crisps) and British "chips" (French fries) are spelled alike and mean different food; each direction only ever produces one of them
+    t.add("rubbish", "garbage");
+    t.add("dustbin", "garbage can");      // one-directional: "garbage can" is two words
+    t.add("postbox", "mailbox");
+    t.add("cinema", "movie theater");     // one-directional: "movie theater" is two words
+    t.add("flyover", "overpass");
+    t.add("dummy", "pacifier");
+    t.add("trousers", "pants");
+    t.add("pavement", "sidewalk");
+    t.add("trainers", "sneakers");
+    t.add("football", "soccer");
+    t.add("pushchair", "stroller");
+    t.add("jumper", "sweater");
+    t.add("takeaway", "takeout");
+    t.add("drawing pin", "thumbtack");    // one-directional: "drawing pin" is two words
+    t.add("tyre", "tire");
+    t.add("telly", "tv");
+    t.add("vest", "undershirt");
+    t.add("windscreen", "windshield");
+    t.add("spanner", "wrench");
+    t.add("postcode", "zip code");        // one-directional: "zip code" is two words
+    t.add("zip", "zipper");
+    t.add("courgette", "zucchini");
+    t.add("gear lever", "gearshift");     // one-directional: "gear lever" is two words
+    t.add("dressing gown", "robe");       // one-directional: "dressing gown" is two words
+    t.add("flatmate", "roommate");
+
     return t;
 }
 

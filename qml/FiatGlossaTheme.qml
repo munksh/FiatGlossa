@@ -3,8 +3,6 @@ import QtQuick 2.6
 import Sailfish.Silica 1.0
 import Nemo.Configuration 1.0
 
-// Fiat colours, the family standard. Two palettes behind one set of names,
-// switched by one boolean. The only thing that is Glossa's own is the accent.
 QtObject {
     // ---- the switch, remembered between runs ----
     property ConfigurationValue ambientConfig: ConfigurationValue {
@@ -24,6 +22,23 @@ QtObject {
     // Verdigris: the green of old ink and manuscript bindings, where glosses
     // were written in the margin.
     readonly property color accent:        ambient ? Theme.highlightColor : "#006E8C"
+
+    function mixColor(a, b, t) {
+        return Qt.rgba(
+            a.r * (1.0 - t) + b.r * t,
+            a.g * (1.0 - t) + b.g * t,
+            a.b * (1.0 - t) + b.b * t,
+            1.0
+        )
+    }
+
+    // A muted variant of the accent, for the Silica chrome that draws with
+    // palette.highlightColor directly -- the pull-down menu's revealed label
+    // chief among them. Found on Fiat Mos: a saturated accent used raw there
+    // reads far louder as a large glowing fill than it does as a button or a
+    // mark. This mutes only that role; everything the app draws itself still
+    // uses the full accent above.
+    readonly property color chromeAccent: mixColor(accent, primaryText, 0.35)
 
     readonly property color backgroundHigh: "#F2EFE8"
     readonly property color backgroundLow:  "#D8D2C6"
@@ -48,6 +63,13 @@ QtObject {
     // did not happen. Everything else -- busy, translated, local -- is a
     // state and stays in the accent.
     readonly property color wrong: dark ? "#A0403A" : "#8A2B25"
+
+    // The wash under a pressed row or menu item.
+    readonly property color highlightWash: Theme.rgba(accent, 0.15)
+
+    // Taupe, and fixed: Munkstolen's colour, not the app's, so it does not
+    // follow the ambience.
+    readonly property color makerMark: "#7E7566"
 
     // ---- the notch ----
     // Asking a QObject for a property it does not have returns undefined
@@ -82,12 +104,26 @@ QtObject {
         try { p.colorScheme = ambient ? Theme.colorScheme : Theme.DarkOnLight } catch (e) { }
         try { p.primaryColor = primaryText } catch (e) { }
         try { p.secondaryColor = secondaryText } catch (e) { }
-        try { p.highlightColor = accent } catch (e) { }
-        try { p.secondaryHighlightColor = Theme.rgba(accent, 0.6) } catch (e) { }
-        // NOT the accent: this role paints the virtual keyboard's keys.
+        try { p.highlightColor = chromeAccent } catch (e) { }
+        try { p.secondaryHighlightColor = Theme.rgba(chromeAccent, 0.6) } catch (e) { }
+        // A neutral wash for in-app selection/highlight surfaces. NOT the
+        // virtual keyboard -- that turned out to be a separate surface
+        // (Maliit/FutoKeyboard) that reads Theme.*, the system ambience,
+        // directly. It cannot be reached from an app's palette at all, so
+        // this project does not try; it follows the ambience.
         try { p.highlightBackgroundColor = Theme.rgba(primaryText, 0.12) } catch (e) { }
         try { p.errorColor = wrong } catch (e) { }
         try { p.highlightDimmerColor = ambient ? Theme.highlightDimmerColor : backgroundLow } catch (e) { }
         try { p.overlayBackgroundColor = ambient ? Theme.overlayBackgroundColor : backgroundHigh } catch (e) { }
     }
+
+    // Cover layout
+    //
+    // The whole block was missing — CoverPage.qml already read all four of
+    // these, so it was running on undefined. Glossa's figure is the
+    // translation itself, a line of text, so it uses the text fraction.
+    readonly property real coverWordmarkTop: Theme.paddingLarge
+    readonly property real coverSideMargin: Theme.paddingLarge
+    readonly property real coverFigureFraction: 0.28
+    readonly property int coverFigureSize: Theme.fontSizeHuge
 }

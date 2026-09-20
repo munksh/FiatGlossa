@@ -1,8 +1,8 @@
 Name:       harbour-fiatglossa
 Summary:    Fiat Glossa, a small translator
-Version:    1.0.0
+Version:    1.0
 Release:    1
-License:    GPLv3
+License:    MIT
 URL:        https://github.com/munksh/FiatGlossa
 Source0:    %{name}-%{version}.tar.bz2
 Requires:   sailfishsilica-qt5 >= 0.10.9
@@ -22,7 +22,7 @@ phone without asking anyone.
 %setup -q -n %{name}-%{version}
 
 %build
-%qmake5
+%qmake5 APP_VERSION=%{version}
 make %{?_smp_mflags}
 
 %install

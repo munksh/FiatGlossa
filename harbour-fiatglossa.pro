@@ -18,9 +18,21 @@ DISTFILES += \
     qml/FiatGlossaTheme.qml \
     qml/components/Background.qml \
     qml/components/PageHead.qml \
+    qml/components/MunkstolenMark.qml \
+    qml/components/SectionLabel.qml \
     qml/components/Wordmark.qml \
     qml/cover/CoverPage.qml \
+    qml/images/family/harbour-fiatagenda.png \
+    qml/images/family/harbour-fiatmargo.png \
+    qml/images/family/harbour-fiatglossa.png \
+    qml/images/family/harbour-fiatvox.png \
+    qml/images/family/harbour-fiatpons.png \
+    qml/images/family/harbour-fiatlux.png \
+    qml/images/family/harbour-fiatcor.png \
+    qml/images/family/harbour-fiatpassus.png \
+    qml/images/family/harbour-fiatmos.png \
     qml/pages/MainTranslationPage.qml \
+    qml/pages/LanguagePage.qml \
     qml/pages/SettingsPage.qml \
     qml/pages/HelpPage.qml \
     qml/pages/AboutPage.qml \
@@ -30,12 +42,6 @@ DISTFILES += \
 
 SAILFISHAPP_ICONS = 86x86 108x108 128x128 172x172
 
-# Internet access is NOT declared here. It is Permissions=Internet in the
-# [X-Sailjail] block of the .desktop file.
-
-# Every one of these fails silently and each looks like a different bug:
-# a missing root qml is a white screen, a missing qmldir is "FiatGlossaTheme
-# is not a type", a missing .desktop kills the build 200 lines later.
 REQUIRED_FILES = \
     $${TARGET}.desktop \
     qml/$${TARGET}.qml \
@@ -55,3 +61,8 @@ REQUIRED_FILES = \
 for(f, REQUIRED_FILES) {
     !exists($$PWD/$$f): error("Missing $$f -- expected it at $$PWD/$$f")
 }
+
+isEmpty(APP_VERSION) {
+    APP_VERSION = 0.0.0-dev
+}
+DEFINES += APP_VERSION=\\\"$$APP_VERSION\\\"

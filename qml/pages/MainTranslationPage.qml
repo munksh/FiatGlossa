@@ -8,7 +8,6 @@ Page {
     id: page
     allowedOrientations: Orientation.All
 
-    // ---- Fiat colours: every page paints itself ----
     function paint() { FiatGlossaTheme.applyPalette(page) }
     Component.onCompleted: {
         paint()
@@ -19,11 +18,9 @@ Page {
         onAmbientChanged: page.paint()
     }
 
-    // ---- languages ----
     // A language is identified by its DeepL TARGET code, because that is the
-    // code that tells the variants apart -- and the variants are the point of
-    // this app. DeepL's source_lang knows no variants, so the backend derives
-    // it: EN-GB and EN-US both go out as EN.
+    // code that tells the variants apart -- DeepL's source_lang knows no
+    // variants, so the backend derives it: EN-GB and EN-US both go out as EN.
     readonly property var languages: [
         { name: "Detect language",       code: "" },
         { name: "English (Traditional)", code: "EN-GB" },
@@ -72,10 +69,47 @@ Page {
     readonly property string sourceCode: languages[sourceIndex].code
     readonly property string targetCode: targetLanguages[targetIndex].code
 
-    // The button shows the code, the menu shows the name: a code is short
+    // The button shows the code, the picker shows the name: a code is short
     // enough to sit on one line beside its twin, and this is an instrument.
     readonly property string sourceLabel: sourceIndex === 0 ? "detect" : sourceCode
     readonly property string targetLabel: targetCode
+
+    // Full names for the caption line under the buttons -- where "EN-US"
+    // just reads as a code, "English (Simplified)" reads as the feature.
+    // Under Detect language the button still just says "detect", but once
+    // DeepL has actually detected something, the caption names it -- and
+    // falls back to "Detect language" itself before that first translation.
+    readonly property string sourceName: sourceIndex !== 0
+        ? languages[sourceIndex].name
+        : (glossa.detectedSource !== "" ? nameForCode(glossa.detectedSource) : languages[0].name)
+    readonly property string targetName: targetLanguages[targetIndex].name
+
+    // Both ends of the same language: EN-GB to EN-US, ZH-HANT to ZH-HANS,
+    // PT-PT to PT-BR. DeepL takes no variant as a SOURCE, so it sees one
+    // language on both ends, finds nothing to translate, and hands the text
+    // back nearly as written. Worth saying out loud rather than letting it
+    // look like the app did nothing.
+    readonly property string sourceFamily: sourceIndex !== 0
+        ? sourceCode.split("-")[0]
+        : glossa.detectedSource.split("-")[0]
+    readonly property string targetFamily: targetCode.split("-")[0]
+    readonly property bool sameFamily: sourceFamily !== "" && sourceFamily === targetFamily
+    readonly property string familyName: nameForCode(targetFamily)
+
+    property bool noticeOpen: false
+
+    // DeepL's source_lang carries no variant, so a detected family that has
+    // one (English, Chinese, Portuguese) shows its bare name rather than
+    // guessing which half of the pair was actually seen.
+    function nameForCode(code) {
+        for (var i = 0; i < languages.length; ++i)
+            if (languages[i].code === code) return languages[i].name
+        if (code === "EN") return "English"
+        if (code === "ZH") return "Chinese"
+        if (code === "PT") return "Portuguese"
+        if (code === "NO" || code === "NN") return "Norwegian"
+        return code
+    }
 
     // Swapping needs somewhere to swap to. Under "Detect language" that means
     // DeepL must have told us what it detected.
@@ -118,6 +152,38 @@ Page {
         glossa.cancel()
     }
 
+    // The list is its own page rather than a menu. 36 entries with variants
+    // will not open inline here: the two cards are anchored between the head
+    // and the status line, so anything that grows the head squashes them to
+    // nothing and takes its own tail off the bottom of the screen with it.
+    function pickSource() {
+        var picker = pageStack.animatorPush(Qt.resolvedUrl("LanguagePage.qml"), {
+            languages: page.languages,
+            currentIndex: page.sourceIndex,
+            heading: qsTr("translate from")
+        })
+        picker.pageCompleted.connect(function (p) {
+            p.selected.connect(function (i) {
+                page.sourceIndex = i
+                page.selectionChanged()
+            })
+        })
+    }
+
+    function pickTarget() {
+        var picker = pageStack.animatorPush(Qt.resolvedUrl("LanguagePage.qml"), {
+            languages: page.targetLanguages,
+            currentIndex: page.targetIndex,
+            heading: qsTr("translate into")
+        })
+        picker.pageCompleted.connect(function (p) {
+            p.selected.connect(function (i) {
+                page.targetIndex = i
+                page.selectionChanged()
+            })
+        })
+    }
+
     function translateNow() {
         input.focus = false
         glossa.translate(input.text, sourceCode, targetCode)
@@ -157,15 +223,21 @@ Page {
         contentHeight: height              // the split fills the page; nothing scrolls
 
         PullDownMenu {
-            MenuItem {
-                text: FiatGlossaTheme.ambient ? "Fiat colours" : "Follow ambience"
-                color: FiatGlossaTheme.primaryText
-                onClicked: FiatGlossaTheme.setAmbient(!FiatGlossaTheme.ambient)
-            }
+            // Without this the menu's selection highlight follows Silica's
+            // chrome default rather than this app's colour. chromeAccent
+            // rather than the raw accent: teal at full saturation reads as a
+            // large glowing fill rather than as an accent.
+            highlightColor: FiatGlossaTheme.chromeAccent
+
             MenuItem {
                 text: "About"
                 color: FiatGlossaTheme.primaryText
                 onClicked: pageStack.push(Qt.resolvedUrl("AboutPage.qml"))
+            }
+            MenuItem {
+                text: FiatGlossaTheme.ambient ? "Fiat colours" : "Follow ambience"
+                color: FiatGlossaTheme.primaryText
+                onClicked: FiatGlossaTheme.setAmbient(!FiatGlossaTheme.ambient)
             }
             MenuItem {
                 text: "Settings"
@@ -193,7 +265,6 @@ Page {
             }
         }
 
-        // ---- head: wordmark, then the two languages on one line ----
         Column {
             id: head
             width: parent.width
@@ -215,27 +286,201 @@ Page {
                         id: fromButton
                         text: page.sourceLabel
                         preferredWidth: Theme.buttonWidthSmall
-                        onClicked: fromMenu.show(fromButton)
+                        onClicked: page.pickSource()
                     }
 
-                    IconButton {
+                    // Drawn rather than image://theme/icon-m-swap. That icon
+                    // does not exist in the theme -- it failed to resolve and
+                    // left an invisible button in the middle of the row.
+                    MouseArea {
+                        id: swapButton
                         anchors.verticalCenter: fromButton.verticalCenter
-                        icon.source: "image://theme/icon-m-swap"
+                        width: Theme.iconSizeMedium
+                        height: Theme.iconSizeMedium
                         enabled: page.canSwap
                         onClicked: page.swapLanguages()
+
+                        onEnabledChanged: swapGlyph.requestPaint()
+                        onPressedChanged: swapGlyph.requestPaint()
+
+                        Canvas {
+                            id: swapGlyph
+                            anchors.fill: parent
+                            renderStrategy: Canvas.Immediate
+                            opacity: swapButton.enabled ? 1.0 : 0.35
+
+                            Connections {
+                                target: FiatGlossaTheme
+                                onAmbientChanged: swapGlyph.requestPaint()
+                            }
+
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.reset()
+                                ctx.clearRect(0, 0, width, height)
+
+                                ctx.strokeStyle = swapButton.pressed
+                                                  ? FiatGlossaTheme.accent
+                                                  : FiatGlossaTheme.primaryText
+                                ctx.fillStyle = ctx.strokeStyle
+                                ctx.lineWidth = Math.max(1, width * 0.07)
+                                ctx.lineCap = "round"
+
+                                var x0 = width * 0.22
+                                var x1 = width * 0.78
+                                var head = width * 0.18
+                                var yTop = height * 0.36
+                                var yBot = height * 0.64
+
+                                // Upper arrow points left, lower points right.
+                                ctx.beginPath()
+                                ctx.moveTo(x0, yTop)
+                                ctx.lineTo(x1, yTop)
+                                ctx.stroke()
+
+                                ctx.beginPath()
+                                ctx.moveTo(x0, yTop)
+                                ctx.lineTo(x0 + head, yTop - head * 0.55)
+                                ctx.lineTo(x0 + head, yTop + head * 0.55)
+                                ctx.closePath()
+                                ctx.fill()
+
+                                ctx.beginPath()
+                                ctx.moveTo(x0, yBot)
+                                ctx.lineTo(x1, yBot)
+                                ctx.stroke()
+
+                                ctx.beginPath()
+                                ctx.moveTo(x1, yBot)
+                                ctx.lineTo(x1 - head, yBot - head * 0.55)
+                                ctx.lineTo(x1 - head, yBot + head * 0.55)
+                                ctx.closePath()
+                                ctx.fill()
+                            }
+                        }
                     }
 
                     Button {
                         id: toButton
                         text: page.targetLabel
                         preferredWidth: Theme.buttonWidthSmall
-                        onClicked: toMenu.show(toButton)
+                        onClicked: page.pickTarget()
                     }
                 }
             }
+
+            // Same widths and spacing as the button row above, so each name
+            // sits under its own button and the arrow sits under the swap
+            // glyph, rather than the three drifting as one centered line.
+            Row {
+                id: captionRow
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: Theme.paddingMedium
+
+                Label {
+                    width: fromButton.width
+                    horizontalAlignment: Text.AlignHCenter
+                    truncationMode: TruncationMode.Fade
+                    font.pixelSize: Theme.fontSizeExtraSmall
+                    color: FiatGlossaTheme.secondaryText
+                    text: page.sourceName
+                }
+                Label {
+                    width: swapButton.width
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Theme.fontSizeExtraSmall
+                    color: FiatGlossaTheme.secondaryText
+                    text: "→"
+                }
+                Label {
+                    width: toButton.width
+                    horizontalAlignment: Text.AlignHCenter
+                    truncationMode: TruncationMode.Fade
+                    font.pixelSize: Theme.fontSizeExtraSmall
+                    color: FiatGlossaTheme.secondaryText
+                    text: page.targetName
+                }
+            }
+
+            // Shown only for a same-language pair, and silent until tapped:
+            // the cards below are anchored to the bottom of this column, so
+            // anything that stands open up here takes height from them.
+            Item {
+                width: parent.width
+                height: page.sameFamily ? Theme.iconSizeMedium : 0
+                visible: page.sameFamily
+
+                // The glyph is small, the tap target is not: the drawing
+                // takes a fraction of a full-sized touch area rather than
+                // asking for a finger the size of the mark.
+                MouseArea {
+                    anchors.centerIn: parent
+                    width: Theme.iconSizeMedium
+                    height: Theme.iconSizeMedium
+                    onClicked: page.noticeOpen = !page.noticeOpen
+
+                    Canvas {
+                        id: infoGlyph
+                        anchors.fill: parent
+                        renderStrategy: Canvas.Immediate
+
+                        Connections {
+                            target: FiatGlossaTheme
+                            onAmbientChanged: infoGlyph.requestPaint()
+                        }
+                        Connections {
+                            target: page
+                            onNoticeOpenChanged: infoGlyph.requestPaint()
+                        }
+
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.reset()
+                            ctx.clearRect(0, 0, width, height)
+
+                            ctx.strokeStyle = page.noticeOpen
+                                              ? FiatGlossaTheme.accent
+                                              : FiatGlossaTheme.secondaryText
+                            ctx.fillStyle = ctx.strokeStyle
+
+                            var c = width / 2
+                            var r = width * 0.22
+
+                            ctx.lineWidth = Math.max(1, r * 0.16)
+                            ctx.lineCap = "round"
+
+                            ctx.beginPath()
+                            ctx.arc(c, c, r, 0, Math.PI * 2)
+                            ctx.stroke()
+
+                            ctx.beginPath()
+                            ctx.arc(c, c - r * 0.45, r * 0.13, 0, Math.PI * 2)
+                            ctx.fill()
+
+                            ctx.beginPath()
+                            ctx.moveTo(c, c - r * 0.12)
+                            ctx.lineTo(c, c + r * 0.52)
+                            ctx.stroke()
+                        }
+                    }
+                }
+            }
+
+            Label {
+                visible: page.sameFamily && page.noticeOpen
+                x: Theme.horizontalPageMargin
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                wrapMode: Text.Wrap
+                horizontalAlignment: Text.AlignHCenter
+                font.pixelSize: Theme.fontSizeExtraSmall
+                color: FiatGlossaTheme.secondaryText
+                text: "DeepL finds little to translate with " + page.familyName
+                      + " on both sides: most words come back as written, spelling included. "
+                      + "A single word is respelt here on the phone instead."
+            }
         }
 
-        // ---- the split: what you type above, what comes back below ----
+        // The split: what you type above, what comes back below.
         Item {
             id: split
             anchors.top: head.bottom
@@ -311,7 +556,6 @@ Page {
             }
         }
 
-        // ---- status, then the primary action, low, where the thumb is ----
         Label {
             id: status
             anchors.bottom: go.top
@@ -339,37 +583,6 @@ Page {
             text: "Translate"
             enabled: input.text !== "" && !glossa.busy
             onClicked: page.translateNow()
-        }
-    }
-
-    // The menus live outside the layout and are shown against their button.
-    ContextMenu {
-        id: fromMenu
-        Repeater {
-            model: page.languages
-            MenuItem {
-                text: modelData.name
-                color: FiatGlossaTheme.primaryText
-                onClicked: {
-                    page.sourceIndex = index
-                    page.selectionChanged()
-                }
-            }
-        }
-    }
-
-    ContextMenu {
-        id: toMenu
-        Repeater {
-            model: page.targetLanguages
-            MenuItem {
-                text: modelData.name
-                color: FiatGlossaTheme.primaryText
-                onClicked: {
-                    page.targetIndex = index
-                    page.selectionChanged()
-                }
-            }
         }
     }
 }
