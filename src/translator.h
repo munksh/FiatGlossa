@@ -22,6 +22,8 @@ class Translator : public QObject
     Q_OBJECT
     Q_PROPERTY(QString apiKey READ apiKey WRITE setApiKey NOTIFY apiKeyChanged)
     Q_PROPERTY(bool hasKey READ hasKey NOTIFY apiKeyChanged)
+    Q_PROPERTY(QString tsServer READ tsServer WRITE setTsServer NOTIFY tsServerChanged)
+    Q_PROPERTY(bool hasTsServer READ hasTsServer NOTIFY tsServerChanged)
 
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
@@ -42,6 +44,9 @@ public:
     QString apiKey() const { return m_apiKey; }
     void setApiKey(const QString &key);
     bool hasKey() const { return !m_apiKey.isEmpty(); }
+    QString tsServer() const { return m_tsServer; }
+    void setTsServer(const QString &server);
+    bool hasTsServer() const { return !m_tsServer.isEmpty(); }
 
     bool busy() const { return m_busy; }
     QString error() const { return m_error; }
@@ -62,6 +67,7 @@ public:
 
 signals:
     void apiKeyChanged();
+    void tsServerChanged();
     void busyChanged();
     void errorChanged();
     void translationChanged();
@@ -81,6 +87,7 @@ private:
     QTimer *m_timeout;
 
     QString m_apiKey;
+    QString m_tsServer;
     QPointer<QNetworkReply> m_reply;
     QPointer<QNetworkReply> m_usageReply;
     quint64 m_serial = 0;

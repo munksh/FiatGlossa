@@ -87,20 +87,40 @@ void Translator::setApiKey(const QString &key)
     emit usageChanged();
     refreshUsage();
 }
+void Translator::setTsServer(const QString &server)
+{
+    const QString k = server.trimmed();
+    if (k == m_tsServer)
+        return;
 
+    m_tsServer = k;
+    emit tsServerChanged() ;
+
+    m_usageKnown = false;
+    m_used = 0;
+    m_limit = -1;
+    emit usageChanged();
+    refreshUsage();
+}
 QUrl Translator::endpoint(const char *path) const
 {
+    // if a tsServer is given, just use the configured engine url + endpoint
+    if ( ! m_tsServer.isEmpty()) {
+       qDebug() << "url: " << m_tsServer.toLatin1() ;
+        return QUrl(m_tsServer.toLatin1() + QLatin1String(path));
+       }
     // A free-tier key ends in ":fx" and only works on the free host.
     const QString host = m_apiKey.endsWith(QLatin1String(":fx"))
         ? QStringLiteral("https://api-free.deepl.com")
         : QStringLiteral("https://api.deepl.com");
-    return QUrl(host + QLatin1String(path));
+    return QUrl(host + "/v2" +QLatin1String(path));
 }
 
 // ------------------------------------------------------------- translation --
 
 void Translator::translate(const QString &text, const QString &source, const QString &target)
 {
+    qDebug() << "text: " << text ;
     abortTranslation();
 
     if (text.trimmed().isEmpty()) {
@@ -122,7 +142,7 @@ void Translator::translate(const QString &text, const QString &source, const QSt
         finishOk(text, true, QString(), 0);
         return;
     }
-    if (m_apiKey.isEmpty()) {
+    if (m_apiKey.isEmpty() &&  m_tsServer.isEmpty()) {
         finishError(tr("No DeepL key yet. Settings has a page on how to get one."));
         return;
     }
@@ -131,13 +151,32 @@ void Translator::translate(const QString &text, const QString &source, const QSt
     texts.append(text);
     QJsonObject body;
     body.insert(QStringLiteral("text"), texts);
-    body.insert(QStringLiteral("target_lang"), target);
-    if (!source.isEmpty())
+
+    // ts_server expects _ISO_639-1_codes which are lower case
+    if ( ! m_tsServer.isEmpty()) {
+        body.insert(QStringLiteral("target_lang"), target.toLower());
+    } else {
+        body.insert(QStringLiteral("target_lang"), target);
+    }
+    // use input source designator unless it's a TSserver
+    if ( ! source.isEmpty() )
         body.insert(QStringLiteral("source_lang"), engineSource(source));
 
-    QNetworkRequest request(endpoint("/v2/translate"));
+    // default to auto source for now when using ts_server
+    if ( ! m_tsServer.isEmpty())
+        body.insert(QStringLiteral("source_lang"), QStringLiteral("auto"));
+
+
+
+    QNetworkRequest request(endpoint("/translate"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Authorization", "DeepL-Auth-Key " + m_apiKey.toUtf8());
+    // we have a ts_server, use it instead
+    if ( ! m_tsServer.isEmpty() ) {
+        qDebug() << "got to set request";
+        QNetworkRequest request(endpoint("/translate"));
+        request.setRawHeader("Authorization", "Bearer " + m_apiKey.toUtf8());
+    }
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("harbour-fiatglossa/1.0"));
 
     m_target = target;
@@ -185,7 +224,12 @@ void Translator::onTranslateFinished(QNetworkReply *reply, quint64 serial)
     m_timedOut = false;
 
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+    qDebug() << "status: " << status;
     const QJsonObject obj = parseObject(reply->readAll());
+
+
+    qDebug() << "status: " << obj;
 
     const QJsonArray translations = obj.value(QStringLiteral("translations")).toArray();
     if (!translations.isEmpty()) {

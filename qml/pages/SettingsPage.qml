@@ -21,8 +21,15 @@ Page {
         key: "/apps/harbour-fiatglossa/apikey"
         defaultValue: ""
     }
-
-    function save() { apiKeyConfig.value = keyField.text.trim() }
+    ConfigurationValue {
+        id: tsServerConfig
+        key: "/apps/harbour-fiatglossa/tsserver"
+        defaultValue: "https://ts.poetaster.de/v1/engines/nllb200_3.3B_q8"
+    }
+    function save() {
+        apiKeyConfig.value = keyField.text.trim()
+        tsServerConfig.value  = tsServerField.text.trim()
+    }
 
     // Swiping back does not always take focus from a field first, so save on
     // the way out as well.
@@ -77,7 +84,19 @@ Page {
                     glossa.refreshUsage()
                 }
             }
-
+            TextField {
+                id: tsServerField
+                width: parent.width
+                label: "A ts_server URL"
+                placeholderText: "https://ts.poetaster.de/v1/engines/nllb200_3.3B"
+                text: tsServerConfig.value
+                inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhSensitiveData
+                EnterKey.iconSource: "image://theme/icon-m-enter-close"
+                EnterKey.onClicked: {
+                    focus = false
+                    tsServerConfig.value  = tsServerField.text.trim()
+                }
+            }
             // A well, not a card: this is a readout.
             Rectangle {
                 x: Theme.horizontalPageMargin
@@ -104,6 +123,7 @@ Page {
                               ? glossa.charactersUsed + " of " + glossa.characterLimit + " characters used"
                               : glossa.charactersUsed + " characters used"
                 }
+
             }
 
             Label {
