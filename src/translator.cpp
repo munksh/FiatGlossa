@@ -13,7 +13,7 @@
 
 namespace {
 
-const int TimeoutMs = 15000;
+const int TimeoutMs = 55000;
 
 bool isEnglishVariant(const QString &code)
 {
