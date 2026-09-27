@@ -1,6 +1,6 @@
 Name:       harbour-fiatglossa
 Summary:    Fiat Glossa, a small translator
-Version:    1.0
+Version:    1.1
 Release:    1
 License:    MIT
 URL:        https://github.com/munksh/FiatGlossa
