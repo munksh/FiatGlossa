@@ -153,8 +153,8 @@ void Translator::translate(const QString &text, const QString &source, const QSt
     body.insert(QStringLiteral("text"), texts);
 
     // ts_server expects _ISO_639-1_codes which are lower case
-    if ( ! m_tsServer.isEmpty()) {
-        body.insert(QStringLiteral("target_lang"), target.toLower());
+    if (!m_tsServer.isEmpty()) {
+        body.insert(QStringLiteral("target_lang"), engineSource(target).toLower());
     } else {
         body.insert(QStringLiteral("target_lang"), target);
     }
@@ -170,13 +170,11 @@ void Translator::translate(const QString &text, const QString &source, const QSt
 
     QNetworkRequest request(endpoint("/translate"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
-    request.setRawHeader("Authorization", "DeepL-Auth-Key " + m_apiKey.toUtf8());
-    // we have a ts_server, use it instead
-    if ( ! m_tsServer.isEmpty() ) {
-        qDebug() << "got to set request";
-        QNetworkRequest request(endpoint("/translate"));
-        request.setRawHeader("Authorization", "Bearer " + m_apiKey.toUtf8());
+
+    if (m_tsServer.isEmpty()) {
+        request.setRawHeader("Authorization", "DeepL-Auth-Key " + m_apiKey.toUtf8());
     }
+
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("harbour-fiatglossa/1.0"));
 
     m_target = target;
@@ -237,15 +235,28 @@ void Translator::onTranslateFinished(QNetworkReply *reply, quint64 serial)
         const QString text = first.value(QStringLiteral("text")).toString();
         const int billed = first.value(QStringLiteral("billed_characters")).toInt();
         QString detected;
-        if (m_autoSource)
-            detected = identityFor(first.value(QStringLiteral("detected_source_language")).toString().toUpper());
+        if (m_autoSource) {
+            QString detectedCode =
+                first.value(QStringLiteral("detected_source_language")).toString();
+
+            if (detectedCode.isEmpty())
+                detectedCode =
+                    first.value(QStringLiteral("detected_source_lang")).toString();
+
+            detected = identityFor(detectedCode.toUpper());
+        }
+
         finishOk(text, false, detected, billed);
-        refreshUsage();             // keep the counter in Settings honest
+
+        if (m_tsServer.isEmpty())
+            refreshUsage();         // DeepL character counter
         return;
     }
 
     if (timedOut) {
-        finishError(tr("DeepL took too long to answer."));
+        finishError(m_tsServer.isEmpty()
+                    ? tr("DeepL took too long to answer.")
+                    : tr("The TextSynth server took too long to answer."));
         return;
     }
     finishError(messageFor(status, obj));
@@ -253,7 +264,7 @@ void Translator::onTranslateFinished(QNetworkReply *reply, quint64 serial)
 
 // DeepL returns {"message": "..."} for most failures. The status code is the
 // part worth translating into something a person can act on.
-QString Translator::messageFor(int status, const QJsonObject &obj)
+QString Translator::messageFor(int status, const QJsonObject &obj) const
 {
     const QString detail = obj.value(QStringLiteral("message")).toString();
 
@@ -273,10 +284,16 @@ QString Translator::messageFor(int status, const QJsonObject &obj)
         break;
     }
     if (status >= 500)
-        return tr("DeepL is having trouble. Try again shortly.");
+        return m_tsServer.isEmpty()
+            ? tr("DeepL is having trouble. Try again shortly.")
+            : tr("The TextSynth server is having trouble. Try again shortly.");
+
     if (!detail.isEmpty())
         return detail;
-    return tr("Could not reach DeepL.");
+
+    return m_tsServer.isEmpty()
+        ? tr("Could not reach DeepL.")
+        : tr("Could not reach the TextSynth server.");
 }
 
 // ------------------------------------------------------------------- usage --
@@ -289,7 +306,7 @@ void Translator::refreshUsage()
         m_usageReply = nullptr;
         reply->abort();
     }
-    if (m_apiKey.isEmpty())
+    if (m_apiKey.isEmpty() || !m_tsServer.isEmpty())
         return;
 
     QNetworkRequest request(endpoint("/v2/usage"));

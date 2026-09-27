@@ -568,8 +568,12 @@ Page {
             color: glossa.error !== "" ? FiatGlossaTheme.wrong : FiatGlossaTheme.secondaryText
             text: glossa.error !== "" ? glossa.error
                 : glossa.local ? "Respelt on the phone. Nothing sent, nothing spent."
-                : glossa.translation !== "" ? "via DeepL, " + glossa.billedCharacters + " characters"
-                : !glossa.hasKey ? "No DeepL key yet. Settings, then How to get a key."
+                : glossa.translation !== "" && glossa.hasTsServer
+                    ? "via TextSynth server"
+                : glossa.translation !== ""
+                    ? "via DeepL, " + glossa.billedCharacters + " characters"
+                : !glossa.hasKey && !glossa.hasTsServer
+                    ? "Choose a translation service in Settings."
                 : ""
         }
 

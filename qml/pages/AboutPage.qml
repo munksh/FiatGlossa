@@ -48,7 +48,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatGlossaTheme.secondaryText
-                text: qsTr("Translations come from DeepL, with a key that belongs to you. fiat glossa has no server and no account: your text goes from the phone to DeepL and nowhere else.")
+                text: qsTr("Translations can come from DeepL, Poetaster's community TextSynth server, or a compatible server of your own. The service is chosen in Settings.")
             }
 
             Label {
@@ -90,51 +90,60 @@ Page {
 
             // -- The motto -------------------------------------------------
 
+            Item { width: 1; height: Theme.paddingLarge }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Theme.itemSizeSmall
+                height: 1
+                color: FiatGlossaTheme.innerBorder
+            }
+
+            Item { width: 1; height: Theme.paddingMedium }
+
+            Column {
+                width: content.width
+                spacing: Theme.paddingSmall
+
+                Label {
+                    x: Theme.horizontalPageMargin
+                    width: parent.width - Theme.horizontalPageMargin * 2
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: FiatGlossaTheme.serif
+                    font.italic: true
+                    color: FiatGlossaTheme.primaryText
+                    text: "Non verbum e verbo,\nsed sensum exprimere de sensu"
+                }
+
+                Label {
+                    x: Theme.horizontalPageMargin
+                    width: parent.width - Theme.horizontalPageMargin * 2
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Theme.fontSizeExtraSmall
+                    color: FiatGlossaTheme.secondaryText
+                    text: qsTr("Not word for word, but sense for sense.")
+                }
+
+                Label {
+                    x: Theme.horizontalPageMargin
+                    width: parent.width - Theme.horizontalPageMargin * 2
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Theme.fontSizeTiny
+                    color: FiatGlossaTheme.secondaryText
+                    text: "Jerome, Epistula 57.5"
+                }
+            }
+
             Item { width: 1; height: Theme.paddingMedium }
 
             Rectangle {
-                x: Theme.horizontalPageMargin
-                width: content.width - Theme.horizontalPageMargin * 2
-                height: mottoColumn.height + Theme.paddingLarge * 2
-                radius: FiatGlossaTheme.cardRadius
-                color: FiatGlossaTheme.card
-                border.color: FiatGlossaTheme.cardBorder
-                border.width: FiatGlossaTheme.cardBorderWidth
-
-                Column {
-                    id: mottoColumn
-                    anchors.centerIn: parent
-                    width: parent.width - Theme.paddingLarge * 2
-                    spacing: Theme.paddingSmall
-
-                    Label {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        horizontalAlignment: Text.AlignHCenter
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: FiatGlossaTheme.serif
-                        font.italic: true
-                        color: FiatGlossaTheme.primaryText
-                        text: "Non verbum e verbo,\nsed sensum exprimere de sensu"
-                    }
-
-                    Label {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        horizontalAlignment: Text.AlignHCenter
-                        font.pixelSize: Theme.fontSizeExtraSmall
-                        color: FiatGlossaTheme.secondaryText
-                        text: qsTr("Not word for word, but sense for sense.")
-                    }
-
-                    Label {
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        font.pixelSize: Theme.fontSizeTiny
-                        color: FiatGlossaTheme.secondaryText
-                        text: "Jerome, Epistula 57.5"
-                    }
-                }
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Theme.itemSizeSmall
+                height: 1
+                color: FiatGlossaTheme.innerBorder
             }
 
             // -- Privacy ---------------------------------------------------
@@ -150,7 +159,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatGlossaTheme.secondaryText
-                text: qsTr("There is no account and no server of ours. Text you translate travels from this phone straight to DeepL, using a key that belongs to you, and nowhere else.")
+                text: qsTr("Text you translate is sent directly to the service selected in Settings: DeepL, Poetaster's community server, or a compatible server of your own.")
             }
 
             Label {
@@ -159,7 +168,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatGlossaTheme.secondaryText
-                text: qsTr("Nothing is measured or reported. The only things kept between sessions are your DeepL key and your last-used languages.")
+                text: qsTr("Fiat Glossa has no account of its own and does not measure or report your translations. The phone keeps your selected service, its settings, and your last-used languages. A DeepL key is stored unencrypted when you choose DeepL.")
             }
 
             // -- Who ---------------------------------------------------------
@@ -184,6 +193,56 @@ Page {
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatGlossaTheme.secondaryText
                 text: "Caesar Prometheus Ivarsson"
+            }
+
+            SectionLabel {
+                x: Theme.horizontalPageMargin
+                text: qsTr("Contribution")
+            }
+
+            Label {
+                x: Theme.horizontalPageMargin
+                width: parent.width - Theme.horizontalPageMargin * 2
+                font.pixelSize: Theme.fontSizeMedium
+                font.family: FiatGlossaTheme.serif
+                color: FiatGlossaTheme.primaryText
+                text: "Poetaster"
+            }
+
+            Label {
+                x: Theme.horizontalPageMargin
+                width: parent.width - Theme.horizontalPageMargin * 2
+                wrapMode: Text.WordWrap
+                font.pixelSize: Theme.fontSizeExtraSmall
+                color: FiatGlossaTheme.secondaryText
+                text: qsTr("Contributed TextSynth Server support and provides the community translation service.")
+            }
+
+            BackgroundItem {
+                width: parent.width
+                height: Theme.itemSizeSmall
+                highlightedColor: FiatGlossaTheme.highlightWash
+                onClicked: Qt.openUrlExternally("https://liberapay.com/poetaster")
+
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: Theme.horizontalPageMargin
+                    width: parent.width - Theme.horizontalPageMargin * 2
+
+                    Label {
+                        width: parent.width
+                        color: FiatGlossaTheme.accent
+                        font.pixelSize: Theme.fontSizeSmall
+                        text: "liberapay.com/poetaster"
+                    }
+
+                    Label {
+                        width: parent.width
+                        color: FiatGlossaTheme.secondaryText
+                        font.pixelSize: Theme.fontSizeExtraSmall
+                        text: qsTr("Support Poetaster's work")
+                    }
+                }
             }
 
             BackgroundItem {
@@ -265,7 +324,7 @@ Page {
                     { name: "fiat glossa", what: qsTr("let there be tongue — this one"), icon: "images/family/harbour-fiatglossa.png", url: "" },
                     { name: "fiat vox", what: qsTr("let there be voice — a chromatic tuner"), icon: "images/family/harbour-fiatvox.png", url: "https://openrepos.net/content/munkstolen/fiat-vox-chromatic-tuner" },
                     { name: "fiat pons", what: qsTr("let there be bridge — a native Qobuz client"), icon: "images/family/harbour-fiatpons.png", url: "https://openrepos.net/content/munkstolen/fiat-pons-native-qobuz-client" },
-                    { name: "fiat lux", what: qsTr("let there be light — a light meter for film - Coming soon"), icon: "images/family/harbour-fiatlux.png", url: "" },
+                    { name: "fiat lux", what: qsTr("let there be light — a light meter for film"), icon: "images/family/harbour-fiatlux.png", url: "https://openrepos.net/content/munkstolen/fiat-lux-lightmeter-film-photography" },
                     { name: "fiat cor", what: qsTr("let there be heart — a metronome"), icon: "images/family/harbour-fiatcor.png", url: "https://openrepos.net/content/munkstolen/fiat-cor-a-metronome" },
                     { name: "fiat passus", what: qsTr("let there be step — a step counter - Coming soon"), icon: "images/family/harbour-fiatpassus.png", url: "" },
                     { name: "fiat mos", what: qsTr("let there be habit — a habit tracker"), icon: "images/family/harbour-fiatmos.png", url: "https://openrepos.net/content/munkstolen/fiat-mos-habit-tracker" }

@@ -81,7 +81,7 @@ private:
     void setBusy(bool busy);
     void setError(const QString &error);
     QUrl endpoint(const char *path) const;
-    static QString messageFor(int status, const QJsonObject &obj);
+    QString messageFor(int status, const QJsonObject &obj) const;
 
     QNetworkAccessManager *m_nam;
     QTimer *m_timeout;
