@@ -25,5 +25,12 @@ ApplicationWindow {
         key: "/apps/harbour-fiatglossa/apikey"
         defaultValue: ""
     }
+    // ts_server server api url config
+    ConfigurationValue {
+        id:tsServerConfig
+        key: "/apps/harbour-fiatglossa/tsserver"
+        defaultValue: ""
+    }
     Binding { target: glossa; property: "apiKey"; value: apiKeyConfig.value }
+    Binding { target: glossa; property: "tsServer"; value: tsServerConfig.value }
 }

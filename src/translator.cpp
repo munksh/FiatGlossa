@@ -13,7 +13,7 @@
 
 namespace {
 
-const int TimeoutMs = 15000;
+const int TimeoutMs = 55000;
 
 bool isEnglishVariant(const QString &code)
 {
@@ -87,20 +87,40 @@ void Translator::setApiKey(const QString &key)
     emit usageChanged();
     refreshUsage();
 }
+void Translator::setTsServer(const QString &server)
+{
+    const QString k = server.trimmed();
+    if (k == m_tsServer)
+        return;
 
+    m_tsServer = k;
+    emit tsServerChanged() ;
+
+    m_usageKnown = false;
+    m_used = 0;
+    m_limit = -1;
+    emit usageChanged();
+    refreshUsage();
+}
 QUrl Translator::endpoint(const char *path) const
 {
+    // if a tsServer is given, just use the configured engine url + endpoint
+    if ( ! m_tsServer.isEmpty()) {
+       qDebug() << "url: " << m_tsServer.toLatin1() ;
+        return QUrl(m_tsServer.toLatin1() + QLatin1String(path));
+       }
     // A free-tier key ends in ":fx" and only works on the free host.
     const QString host = m_apiKey.endsWith(QLatin1String(":fx"))
         ? QStringLiteral("https://api-free.deepl.com")
         : QStringLiteral("https://api.deepl.com");
-    return QUrl(host + QLatin1String(path));
+    return QUrl(host + "/v2" +QLatin1String(path));
 }
 
 // ------------------------------------------------------------- translation --
 
 void Translator::translate(const QString &text, const QString &source, const QString &target)
 {
+    qDebug() << "text: " << text ;
     abortTranslation();
 
     if (text.trimmed().isEmpty()) {
@@ -122,7 +142,7 @@ void Translator::translate(const QString &text, const QString &source, const QSt
         finishOk(text, true, QString(), 0);
         return;
     }
-    if (m_apiKey.isEmpty()) {
+    if (m_apiKey.isEmpty() &&  m_tsServer.isEmpty()) {
         finishError(tr("No DeepL key yet. Settings has a page on how to get one."));
         return;
     }
@@ -131,13 +151,30 @@ void Translator::translate(const QString &text, const QString &source, const QSt
     texts.append(text);
     QJsonObject body;
     body.insert(QStringLiteral("text"), texts);
-    body.insert(QStringLiteral("target_lang"), target);
-    if (!source.isEmpty())
+
+    // ts_server expects _ISO_639-1_codes which are lower case
+    if (!m_tsServer.isEmpty()) {
+        body.insert(QStringLiteral("target_lang"), engineSource(target).toLower());
+    } else {
+        body.insert(QStringLiteral("target_lang"), target);
+    }
+    // use input source designator unless it's a TSserver
+    if ( ! source.isEmpty() )
         body.insert(QStringLiteral("source_lang"), engineSource(source));
 
-    QNetworkRequest request(endpoint("/v2/translate"));
+    // default to auto source for now when using ts_server
+    if ( ! m_tsServer.isEmpty())
+        body.insert(QStringLiteral("source_lang"), QStringLiteral("auto"));
+
+
+
+    QNetworkRequest request(endpoint("/translate"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
-    request.setRawHeader("Authorization", "DeepL-Auth-Key " + m_apiKey.toUtf8());
+
+    if (m_tsServer.isEmpty()) {
+        request.setRawHeader("Authorization", "DeepL-Auth-Key " + m_apiKey.toUtf8());
+    }
+
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("harbour-fiatglossa/1.0"));
 
     m_target = target;
@@ -185,7 +222,12 @@ void Translator::onTranslateFinished(QNetworkReply *reply, quint64 serial)
     m_timedOut = false;
 
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+    qDebug() << "status: " << status;
     const QJsonObject obj = parseObject(reply->readAll());
+
+
+    qDebug() << "status: " << obj;
 
     const QJsonArray translations = obj.value(QStringLiteral("translations")).toArray();
     if (!translations.isEmpty()) {
@@ -193,15 +235,28 @@ void Translator::onTranslateFinished(QNetworkReply *reply, quint64 serial)
         const QString text = first.value(QStringLiteral("text")).toString();
         const int billed = first.value(QStringLiteral("billed_characters")).toInt();
         QString detected;
-        if (m_autoSource)
-            detected = identityFor(first.value(QStringLiteral("detected_source_language")).toString().toUpper());
+        if (m_autoSource) {
+            QString detectedCode =
+                first.value(QStringLiteral("detected_source_language")).toString();
+
+            if (detectedCode.isEmpty())
+                detectedCode =
+                    first.value(QStringLiteral("detected_source_lang")).toString();
+
+            detected = identityFor(detectedCode.toUpper());
+        }
+
         finishOk(text, false, detected, billed);
-        refreshUsage();             // keep the counter in Settings honest
+
+        if (m_tsServer.isEmpty())
+            refreshUsage();         // DeepL character counter
         return;
     }
 
     if (timedOut) {
-        finishError(tr("DeepL took too long to answer."));
+        finishError(m_tsServer.isEmpty()
+                    ? tr("DeepL took too long to answer.")
+                    : tr("The TextSynth server took too long to answer."));
         return;
     }
     finishError(messageFor(status, obj));
@@ -209,7 +264,7 @@ void Translator::onTranslateFinished(QNetworkReply *reply, quint64 serial)
 
 // DeepL returns {"message": "..."} for most failures. The status code is the
 // part worth translating into something a person can act on.
-QString Translator::messageFor(int status, const QJsonObject &obj)
+QString Translator::messageFor(int status, const QJsonObject &obj) const
 {
     const QString detail = obj.value(QStringLiteral("message")).toString();
 
@@ -229,10 +284,16 @@ QString Translator::messageFor(int status, const QJsonObject &obj)
         break;
     }
     if (status >= 500)
-        return tr("DeepL is having trouble. Try again shortly.");
+        return m_tsServer.isEmpty()
+            ? tr("DeepL is having trouble. Try again shortly.")
+            : tr("The TextSynth server is having trouble. Try again shortly.");
+
     if (!detail.isEmpty())
         return detail;
-    return tr("Could not reach DeepL.");
+
+    return m_tsServer.isEmpty()
+        ? tr("Could not reach DeepL.")
+        : tr("Could not reach the TextSynth server.");
 }
 
 // ------------------------------------------------------------------- usage --
@@ -245,7 +306,7 @@ void Translator::refreshUsage()
         m_usageReply = nullptr;
         reply->abort();
     }
-    if (m_apiKey.isEmpty())
+    if (m_apiKey.isEmpty() || !m_tsServer.isEmpty())
         return;
 
     QNetworkRequest request(endpoint("/v2/usage"));
