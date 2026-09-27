@@ -32,6 +32,7 @@ DISTFILES += \
     qml/images/family/harbour-fiatpassus.png \
     qml/images/family/harbour-fiatmos.png \
     qml/pages/MainTranslationPage.qml \
+    qml/workers/translateWorker.js \
     qml/pages/LanguagePage.qml \
     qml/pages/SettingsPage.qml \
     qml/pages/HelpPage.qml \
@@ -51,6 +52,7 @@ REQUIRED_FILES = \
     qml/components/PageHead.qml \
     qml/components/Wordmark.qml \
     qml/pages/MainTranslationPage.qml \
+    qml/workers/translateWorker.js \
     qml/pages/SettingsPage.qml \
     qml/pages/HelpPage.qml \
     qml/pages/AboutPage.qml \

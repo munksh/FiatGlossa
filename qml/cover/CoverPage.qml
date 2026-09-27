@@ -43,11 +43,15 @@ CoverBackground {
         Label {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
-            text: glossa.translation !== "" ? glossa.translation : "Aa"
+            // The C++ backend's result wins; otherwise the worker output the
+            // page published via the theme channel; a quiet "Aa" when empty.
+            readonly property string figure:
+                glossa.translation !== "" ? glossa.translation : FiatGlossaTheme.coverText
+            text: figure !== "" ? figure : "Aa"
             color: FiatGlossaTheme.accent
             font.family: FiatGlossaTheme.serif
-            font.pixelSize: glossa.translation !== "" ? Theme.fontSizeMedium
-                                                      : FiatGlossaTheme.coverFigureSize
+            font.pixelSize: figure !== "" ? Theme.fontSizeMedium
+                                          : FiatGlossaTheme.coverFigureSize
             wrapMode: Text.Wrap
             maximumLineCount: 5
             elide: Text.ElideRight
