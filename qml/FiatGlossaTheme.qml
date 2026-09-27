@@ -117,6 +117,13 @@ QtObject {
         try { p.overlayBackgroundColor = ambient ? Theme.overlayBackgroundColor : backgroundHigh } catch (e) { }
     }
 
+    // ---- shared page -> cover state ----
+    // The translation page publishes its current output here so the lockscreen
+    // cover can mirror it. It lives on this singleton because it is the one
+    // object both the page and the cover already import; it is app state riding
+    // the shared channel, not a theme value.
+    property string coverText: ""
+
     // Cover layout
     //
     // The whole block was missing — CoverPage.qml already read all four of
@@ -125,5 +132,5 @@ QtObject {
     readonly property real coverWordmarkTop: Theme.paddingLarge
     readonly property real coverSideMargin: Theme.paddingLarge
     readonly property real coverFigureFraction: 0.28
-    readonly property int coverFigureSize: Theme.fontSizeHuge
+    readonly property int coverFigureSize: Theme.fontSizeMedium
 }

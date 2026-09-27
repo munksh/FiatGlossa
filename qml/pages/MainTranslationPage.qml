@@ -98,6 +98,25 @@ Page {
 
     property bool noticeOpen: false
 
+    // The result, however it got here. The DeepL path fills it when the C++
+    // backend finishes (translationChanged below); the TextSynth path fills
+    // it line by line as the worker's answers arrive. One property, one
+    // output card, one copy button.
+    property string outputText: ""
+
+    // A TextSynth run, if one is in flight. The page owns the whole run: it
+    // splits the text, paces the lines a breath apart, and puts each answer
+    // back in its place. The worker trades one line for its translation and
+    // keeps no run state of its own.
+    property bool workerRunning: false
+    property string workerError: ""
+    property int workerSerial: 0       // run counter; echoed back in every answer
+    property var workerSource: []      // the text, split into lines
+    property var workerResult: []      // answers, indexed by line position
+    property int workerNext: 0         // first line not yet sent
+    property int workerShown: 0        // first result line not yet in outputText
+    property int paceSerial: -1        // the run the pending breath belongs to
+
     // DeepL's source_lang carries no variant, so a detected family that has
     // one (English, Chinese, Portuguese) shows its bare name rather than
     // guessing which half of the pair was actually seen.
@@ -149,6 +168,7 @@ Page {
         if (!ready) return
         sourceConfig.value = sourceCode
         targetConfig.value = targetCode
+        page.cancelWorker()
         glossa.cancel()
     }
 
@@ -184,15 +204,105 @@ Page {
         })
     }
 
+    // A TextSynth server, if one is set, takes the text -- the same
+    // precedence the C++ backend has -- except the local no-ops, which stay
+    // local: respelling between the two Englishes and a code to itself need
+    // no request at all.
+    function useWorker() {
+        if (!glossa.hasTsServer || input.text.trim() === "")
+            return false
+        if (page.isEnglishVariant(sourceCode) && page.isEnglishVariant(targetCode))
+            return false
+        if (sourceCode !== "" && sourceCode === targetCode)
+            return false
+        return true
+    }
+
+    function isEnglishVariant(code) {
+        return code === "EN-GB" || code === "EN-US"
+    }
+
+    function tsTargetLang(code) {
+        // The server wants bare ISO 639-1, lowercase: EN-GB is en, ZH-HANT is zh.
+        return code.split("-")[0].toLowerCase()
+    }
+
     function translateNow() {
         input.focus = false
+
+        if (useWorker()) {
+            // One line out, its answer in, a breath, the next: a shared
+            // community server, and each line appears the moment it is
+            // translated, the rest following behind.
+            glossa.cancel()
+            workerSerial += 1
+            workerError = ""
+            workerSource = input.text.split(".\ ")
+            workerResult = []
+            workerNext = 0
+            workerShown = 0
+            outputText = ""
+            workerRunning = true
+            sendNextWorkerLine()
+            return
+        }
+
+        cancelWorker()
         glossa.translate(input.text, sourceCode, targetCode)
+    }
+
+    // Send the next line that needs the server. Blank lines are part of the
+    // text, not requests to waste: they take their place without a trip.
+    function sendNextWorkerLine() {
+        if (!workerRunning)
+            return
+        while (workerNext < workerSource.length &&
+               workerSource[workerNext].trim() === "") {
+            workerResult[workerNext] = workerSource[workerNext]
+            workerNext += 1
+        }
+        workerAdvanceShown()
+        if (workerNext >= workerSource.length) {
+            workerRunning = false
+            return
+        }
+        var index = workerNext
+        workerNext += 1
+        tsWorker.sendMessage({
+            serial: workerSerial,
+            index: index,
+            engine: glossa.tsServer,
+            targetLang: tsTargetLang(targetCode),
+            line: workerSource[index] + "."
+        })
+    }
+
+    // Pull finished result lines into the output card, in text order. The
+    // index in each answer exists so this still works if lines ever come
+    // back out of order.
+    function workerAdvanceShown() {
+        while (workerShown < workerResult.length &&
+               workerResult[workerShown] !== undefined) {
+            if (workerShown > 0)
+                outputText += "\n"
+            outputText += workerResult[workerShown]
+            workerShown += 1
+        }
+    }
+
+    // Stop the run: whatever is out there may no longer land. Partial
+    // results stay where they are, the Go button frees up.
+    function cancelWorker() {
+        pace.running = false          // the pending breath must not fire
+        workerSerial += 1             // nothing from the old run may land now
+        workerRunning = false
+        tsWorker.sendMessage({ cancel: true })
     }
 
     function swapLanguages() {
         var from = sourceIndex > 0 ? sourceCode : glossa.detectedSource
         var to = targetCode
-        var carried = glossa.translation
+        var carried = outputText
 
         ready = false
         sourceIndex = Math.max(0, indexOf(languages, to))
@@ -213,6 +323,66 @@ Page {
         id: targetConfig
         key: "/apps/harbour-fiatglossa/target"
         defaultValue: ""
+    }
+
+    // The DeepL path still lives in C++; its result lands in the same place
+    // the worker's lines do.
+    Connections {
+        target: glossa
+        onTranslationChanged: page.outputText = glossa.translation
+    }
+
+    // Publish the page's output onto the cover channel so the lockscreen
+    // mirrors it. It carries the worker's result only: when the C++ backend
+    // (glossa.translation) already holds a result, the cover shows that
+    // instead, so publish nothing here. This is the binding that updates the
+    // cover when the output changes and glossa.translation is blank.
+    Binding {
+        target: FiatGlossaTheme
+        property: "coverText"
+        value: glossa.translation === "" ? page.outputText : ""
+    }
+
+    // The breath between worker requests: one shot, 300 ms, a no-op if the
+    // page has since cancelled or started a newer run.
+    Timer {
+        id: pace
+        repeat: false
+        onTriggered: {
+            if (page.paceSerial === page.workerSerial)
+                page.sendNextWorkerLine()
+        }
+    }
+
+    // One thread, one line at a time: trades a line for its translation and
+    // keeps no run state of its own. The page splits, paces, and reassembles.
+    WorkerScript {
+        id: tsWorker
+        source: Qt.resolvedUrl("../workers/translateWorker.js")
+
+        onMessage: function (messageObject) {
+            if (!messageObject || messageObject.serial !== page.workerSerial)
+                return             // a run the page has already moved past
+
+            if (messageObject.error !== undefined) {
+                page.workerError = messageObject.error
+                page.cancelWorker()
+                return
+            }
+
+            page.workerResult[messageObject.index] = messageObject.line
+            page.workerAdvanceShown()
+
+            if (page.workerNext >= page.workerSource.length) {
+                page.workerRunning = false
+                return
+            }
+
+            // A shared community server: a breath between requests.
+            page.paceSerial = page.workerSerial
+            pace.interval = 300
+            pace.running = true
+        }
     }
 
     Background { }
@@ -250,6 +420,7 @@ Page {
                 enabled: input.text !== ""
                 onClicked: {
                     input.text = ""
+                    page.cancelWorker()
                     glossa.cancel()
                     glossa.translate("", page.sourceCode, page.targetCode)
                 }
@@ -260,8 +431,8 @@ Page {
             MenuItem {
                 text: "Copy translation"
                 color: FiatGlossaTheme.primaryText
-                enabled: glossa.translation !== ""
-                onClicked: Clipboard.text = glossa.translation
+                enabled: page.outputText !== ""
+                onClicked: Clipboard.text = page.outputText
             }
         }
 
@@ -539,8 +710,8 @@ Page {
                         width: parent.width
                         readOnly: true              // still selectable and copyable
                         backgroundStyle: TextEditor.NoBackground
-                        text: glossa.translation
-                        placeholderText: glossa.busy ? "" : "The translation appears here"
+                        text: page.outputText
+                        placeholderText: (glossa.busy || page.workerRunning) ? "" : "The translation appears here"
                         color: FiatGlossaTheme.primaryText
                         font.family: FiatGlossaTheme.serif
                     }
@@ -551,7 +722,7 @@ Page {
                     anchors.top: parent.top
                     anchors.margins: Theme.paddingLarge
                     size: BusyIndicatorSize.Small
-                    running: glossa.busy
+                    running: glossa.busy || page.workerRunning
                 }
             }
         }
@@ -565,12 +736,16 @@ Page {
             horizontalAlignment: Text.AlignHCenter
             truncationMode: TruncationMode.Fade
             font.pixelSize: Theme.fontSizeExtraSmall
-            color: glossa.error !== "" ? FiatGlossaTheme.wrong : FiatGlossaTheme.secondaryText
-            text: glossa.error !== "" ? glossa.error
+            color: page.workerError !== "" || glossa.error !== ""
+                ? FiatGlossaTheme.wrong : FiatGlossaTheme.secondaryText
+            text: page.workerError !== "" ? page.workerError
+                : page.workerRunning
+                    ? "translating, line " + page.workerShown + " of " + page.workerSource.length
+                : glossa.error !== "" ? glossa.error
                 : glossa.local ? "Respelt on the phone. Nothing sent, nothing spent."
-                : glossa.translation !== "" && glossa.hasTsServer
+                : page.outputText !== "" && glossa.hasTsServer
                     ? "via TextSynth server"
-                : glossa.translation !== ""
+                : page.outputText !== ""
                     ? "via DeepL, " + glossa.billedCharacters + " characters"
                 : !glossa.hasKey && !glossa.hasTsServer
                     ? "Choose a translation service in Settings."
@@ -585,7 +760,7 @@ Page {
             anchors.bottomMargin: Theme.paddingLarge
             anchors.horizontalCenter: parent.horizontalCenter
             text: "Translate"
-            enabled: input.text !== "" && !glossa.busy
+            enabled: input.text !== "" && !glossa.busy && !page.workerRunning
             onClicked: page.translateNow()
         }
     }
