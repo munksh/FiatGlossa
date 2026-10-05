@@ -18,6 +18,25 @@ A small translator for Sailfish OS, in the Fiat family. Translates with DeepL
 using your own API key, and settles British against American spelling on the
 phone without asking anyone.
 
+%if 0%{?_chum}
+Title: Fiat Glossa
+Type: desktop-application
+DeveloperName: Munkstolen
+Categories:
+ - Office
+ - Utility
+PackageIcon: https://munkstolen.se/SFOS/harbour-fiatglossa.png
+Screenshots:
+ - https://munkstolen.se/SFOS/fiatglossa1.png
+ - https://munkstolen.se/SFOS/fiatglossa2.png
+ - https://munkstolen.se/SFOS/fiatglossa3.png
+Custom:
+  Repo: https://github.com/munksh/FiatGlossa
+Links:
+  Homepage: https://github.com/munksh/FiatGlossa
+  Bugtracker: https://github.com/munksh/FiatGlossa/issues
+%endif
+
 %prep
 %setup -q -n %{name}-%{version}
 
