@@ -1,8 +1,9 @@
 [Desktop Entry]
+X-Nemo-Application-Type=silica-qt5
 Type=Application
 Icon=harbour-fiatglossa
 Name=fiat glossa
-Exec=/usr/bin/sailjail -p harbour-fiatglossa.desktop /usr/bin/harbour-fiatglossa
+Exec=harbour-fiatglossa
 
 [X-Sailjail]
 Permissions=Internet
